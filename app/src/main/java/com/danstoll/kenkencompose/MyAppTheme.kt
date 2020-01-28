@@ -10,7 +10,7 @@ val green = Color(0xFF1EB980)
 private val themeColors = ColorPalette(
     primary = green,
     surface = Color.LightGray,
-    onSurface = green
+    onSurface = Color.Black
 )
 
 @Composable

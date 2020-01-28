@@ -9,37 +9,91 @@ import androidx.ui.foundation.shape.DrawShape
 import androidx.ui.foundation.shape.RectangleShape
 import androidx.ui.graphics.Color
 import androidx.ui.graphics.Paint
-import androidx.ui.layout.Container
-import androidx.ui.layout.Padding
-import androidx.ui.layout.Stack
-import androidx.ui.layout.Table
+import androidx.ui.layout.*
+import androidx.ui.material.Button
+import androidx.ui.material.ContainedButtonStyle
 import androidx.ui.text.TextStyle
 import androidx.ui.tooling.preview.Preview
 
 @Composable
-fun Grid(board: KenKenBoard = KenKenBoard.generateBoard()) {
+fun KenKenScreen(board: KenKenBoard = KenKenBoard.generateBoard()) {
     WithConstraints { constraints ->
         val containerWidth = withDensity(+ambientDensity()) {
             constraints.maxWidth.toDp()
         }
-        val size = board.kenKenCells.size
-        val squareWidth = (containerWidth / size)
+        val boardSize = board.kenKenCells.size
+        val cellDpSize = (containerWidth / boardSize)
 
-        val selectedIndex = board.getCurrentCellIndex()
+        Column(arrangement = Arrangement.SpaceAround) {
 
-        Table(columns = size) {
-            for (i in 0 until size) {
-                tableRow {
-                    for (j in 0 until size) {
-                        val kenKenCell = board.kenKenCells[i][j].apply {
-                            selected = (selectedIndex.first == i && selectedIndex.second == j)
-                        }
-                        Cell(
-                            size = squareWidth,
-                            kenCell = kenKenCell
-                        ) {
-                            board.selectCell(kenKenCell)
-                        }
+            CheckAnswersButton(board)
+            DrawBoard(board, boardSize, cellDpSize)
+            DrawNumberButtons(board, boardSize, cellDpSize, containerWidth / boardSize)
+            DrawClearButtons(board)
+        }
+
+    }
+}
+
+@Composable
+fun CheckAnswersButton(board: KenKenBoard) {
+    Row(modifier = ExpandedWidth, arrangement = Arrangement.SpaceEvenly) {
+        Button(
+            text = board.checkAnswersText,
+            onClick = { board.toggleCheckAnswers() },
+            style = ContainedButtonStyle()
+        )
+    }
+}
+
+@Composable
+fun DrawNumberButtons(board: KenKenBoard, boardSize: Int, cellDpSize: Dp, maxWidth: Dp) {
+    val textSize = (cellDpSize.value * 0.3f).sp
+    Row(modifier = ExpandedWidth, arrangement = Arrangement.SpaceEvenly) {
+        for (i in 1..boardSize) {
+            Button(
+                onClick = { board.userInput(i) },
+                style = ContainedButtonStyle(),
+                modifier = MaxWidth(maxWidth)
+            )
+            {
+                Text(text = i.toString(), style = TextStyle(fontSize = textSize))
+            }
+        }
+    }
+}
+
+@Composable
+fun DrawClearButtons(board: KenKenBoard) {
+    Row(modifier = ExpandedWidth, arrangement = Arrangement.SpaceEvenly) {
+        Button(
+            text = "Clear Cell",
+            onClick = { board.clearCurrentCell() },
+            style = ContainedButtonStyle()
+        )
+        Button(
+            text = "Clear Board",
+            onClick = { board.clearBoard() },
+            style = ContainedButtonStyle()
+        )
+    }
+}
+
+@Composable
+fun DrawBoard(board: KenKenBoard, boardSize: Int, cellDpSize: Dp) {
+    Table(columns = boardSize) {
+        for (i in 0 until boardSize) {
+            tableRow {
+                for (j in 0 until boardSize) {
+                    val kenKenCell = board.kenKenCells[i][j].apply {
+                        cellType =
+                            CellType.fromCell(this, index == board.getCurrentCellIndex(), board.shouldCheckAnswers())
+                    }
+                    DrawCell(
+                        size = cellDpSize,
+                        kenCell = kenKenCell
+                    ) {
+                        board.selectCell(kenKenCell)
                     }
                 }
             }
@@ -48,7 +102,7 @@ fun Grid(board: KenKenBoard = KenKenBoard.generateBoard()) {
 }
 
 @Composable
-fun Cell(size: Dp, kenCell: KenKenCell, onClick: (KenKenCell) -> Unit) {
+fun DrawCell(size: Dp, kenCell: KenKenCell, onClick: (KenKenCell) -> Unit) {
     val textSize = (size.value * 0.4f).sp
     val operationSize = (size.value * 0.15f).sp
     Clickable(onClick = { onClick(kenCell) }) {
@@ -58,13 +112,15 @@ fun Cell(size: Dp, kenCell: KenKenCell, onClick: (KenKenCell) -> Unit) {
 
                     DrawShape(
                         shape = RectangleShape,
-                        color = if (kenCell.selected) Color.Blue else Color.White
+                        color = kenCell.cellType.color
                     )
-                    DrawKenKenBorder(adjacentCages = kenCell.cage.adjacentCages)
+                    DrawCellBorder(adjacentCages = kenCell.cage.adjacentCages)
                 }
             }
             aligned(Alignment.Center) {
-                Text(text = kenCell.answer.toString(), style = TextStyle(fontSize = textSize))
+                kenCell.userAnswer?.toString()?.let {
+                    Text(text = it, style = TextStyle(fontSize = textSize))
+                }
             }
 
             kenCell.cage.text?.let {
@@ -80,7 +136,11 @@ fun Cell(size: Dp, kenCell: KenKenCell, onClick: (KenKenCell) -> Unit) {
 }
 
 @Composable
-fun DrawKenKenBorder(color: Color = Color.Black, strokeWidth: Int = 3, adjacentCages: Set<AdjacentCage>) {
+fun DrawCellBorder(
+    color: Color = Color.Black,
+    strokeWidth: Int = 3,
+    adjacentCages: Set<AdjacentCage>
+) {
     DrawTopBorder(
         color = color,
         strokeWidth = if (adjacentCages.contains(AdjacentCage.TOP)) 1 else strokeWidth
@@ -101,11 +161,7 @@ fun DrawKenKenBorder(color: Color = Color.Black, strokeWidth: Int = 3, adjacentC
 
 @Composable
 fun DrawTopBorder(color: Color, strokeWidth: Int) {
-    val paint = Paint()
-    paint.color = color
-    paint.strokeWidth = withDensity(+ambientDensity()) {
-        strokeWidth.dp.toPx().value
-    }
+    val paint = getBorderPaint(color, strokeWidth)
     Draw { canvas, parentSize ->
         canvas.drawLine(
             Offset(0f, 0f),
@@ -117,11 +173,7 @@ fun DrawTopBorder(color: Color, strokeWidth: Int) {
 
 @Composable
 fun DrawBottomBorder(color: Color, strokeWidth: Int) {
-    val paint = Paint()
-    paint.color = color
-    paint.strokeWidth = withDensity(+ambientDensity()) {
-        strokeWidth.dp.toPx().value
-    }
+    val paint = getBorderPaint(color, strokeWidth)
     Draw { canvas, parentSize ->
         canvas.drawLine(
             Offset(0f, parentSize.height.value),
@@ -133,11 +185,7 @@ fun DrawBottomBorder(color: Color, strokeWidth: Int) {
 
 @Composable
 fun DrawLeftBorder(color: Color, strokeWidth: Int) {
-    val paint = Paint()
-    paint.color = color
-    paint.strokeWidth = withDensity(+ambientDensity()) {
-        strokeWidth.dp.toPx().value
-    }
+    val paint = getBorderPaint(color, strokeWidth)
     Draw { canvas, parentSize ->
         canvas.drawLine(
             Offset(0f, 0f),
@@ -149,11 +197,7 @@ fun DrawLeftBorder(color: Color, strokeWidth: Int) {
 
 @Composable
 fun DrawRightBorder(color: Color, strokeWidth: Int) {
-    val paint = Paint()
-    paint.color = color
-    paint.strokeWidth = withDensity(+ambientDensity()) {
-        strokeWidth.dp.toPx().value
-    }
+    val paint = getBorderPaint(color, strokeWidth)
     Draw { canvas, parentSize ->
         canvas.drawLine(
             Offset(parentSize.width.value, 0f),
@@ -163,7 +207,6 @@ fun DrawRightBorder(color: Color, strokeWidth: Int) {
     }
 }
 
-//caused crash
 @Composable
 fun getBorderPaint(color: Color, strokeWidth: Int): Paint = Paint().apply {
     this.color = color
@@ -176,6 +219,6 @@ fun getBorderPaint(color: Color, strokeWidth: Int): Paint = Paint().apply {
 @Composable
 fun DefaultPreview() {
     MyAppTheme {
-        Grid()
+        KenKenScreen()
     }
 }
