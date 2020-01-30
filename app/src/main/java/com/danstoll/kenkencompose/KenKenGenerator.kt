@@ -7,21 +7,29 @@ import kotlin.math.min
 import kotlin.random.Random
 
 class KenKenGenerator {
-    // Staring probability of unioning two constraint blocks
-    val startingUnionProb = .7
-    // Probability of using + or x (instead of - or /) for 2 cells
-    val addOrMultTwoCellsProb = .1
-    //Probability of using - (instead of /) for 2 diviable cells (given not using + # or x)
-    val minusProb = .1
-    // Probability of using x instead of + for more than 2 cells
-    val multProb = .5
+
+    companion object {
+        // Staring probability of unioning two constraint blocks
+        private const val startingUnionProb = .7
+        // Probability of using + or x (instead of - or /) for 2 cells
+        private const val addOrMultTwoCellsProb = .1
+        //Probability of using - (instead of /) for 2 diviable cells (given not using + # or x)
+        private const val minusProb = .1
+        // Probability of using x instead of + for more than 2 cells
+        private const val multProb = .5
+    }
 
 
+    private val constraintMap = mutableMapOf<Int, MutableList<Pair<Int, Int>>>()
+    private var board = mutableListOf(mutableListOf<Int>())
+    private var answer = mutableListOf(mutableListOf<Int>())
 
-    val constraintMap = mutableMapOf<Int, MutableList<Pair<Int, Int>>>()
-    var board = mutableListOf(mutableListOf<Int>())
-    var answer = mutableListOf(mutableListOf<Int>())
-    fun generate(size: Int = 4): List<String> {
+    private var kenkenCells = mutableListOf(mutableListOf<KenKenCell>())
+    private val cageMap = mutableMapOf<Pair<Int, String>, List<Pair<Int, Int>>>()
+
+    fun generate(size: Int): List<List<KenKenCell>> {
+
+
         val n = size
         for (i in 0 until n) {
             val tempList = mutableListOf<Int>()
@@ -47,7 +55,7 @@ class KenKenGenerator {
         }
 
         val rowSwaps = List(n) { i -> i }.shuffled()
-        val columnSwaps = List(n) { i -> i}.shuffled()
+        val columnSwaps = List(n) { i -> i }.shuffled()
         val valueSwaps = List(n) { i -> i }.shuffled()
         Log.d("bla", rowSwaps.toString())
         Log.d("bla", columnSwaps.toString())
@@ -62,7 +70,7 @@ class KenKenGenerator {
         answer = answer.filterNot { it.isEmpty() }.toMutableList()
 
         for (i in 0 until n) {
-            answer.add(mutableListOf())
+//            answer.add(mutableListOf())
             for (j in 0 until n) {
                 answer[rowSwaps[i]][columnSwaps[j]] = valueSwaps[(i + j) % n] + 1
             }
@@ -70,42 +78,50 @@ class KenKenGenerator {
 
         // Generate block constraint output
         val constraints = mutableListOf<String>()
-        constraintMap.values.forEach {
-            if(it.isNotEmpty()) {
-                val cells = it.joinToString(" ") { pair -> "${pair.first}, ${pair.second}" }
-                val v = it.map { pair ->  answer[pair.first][pair.second] }
+        constraintMap.forEach { (key, value) ->
+            if (value.isNotEmpty()) {
+                val cells = value.joinToString(" ") { pair -> "${pair.first},${pair.second}" }
+                val v = value.map { pair -> answer[pair.first][pair.second] }
 
                 val type: String
                 val num: Int
 
-                if(v.size == 1) {
-                    type = "!"
+                if (v.size == 1) {
+                    type = ""
                     num = v[0]
-                }
-                else if( v.size == 2 && Random.nextFloat() > addOrMultTwoCellsProb) {
+                } else if (v.size == 2 && Random.nextFloat() > addOrMultTwoCellsProb) {
                     if (max(v[0], v[1]) % min(v[0], v[1]) == 0 && Random.nextFloat() > minusProb) {
                         type = "/"
                         num = max(v[0], v[1]) / min(v[0], v[1])
-                    }
-                    else {
+                    } else {
                         type = "-"
                         num = abs(v[0] - v[1])
                     }
-                }
-                else if( Random.nextFloat() < multProb) {
+                } else if (Random.nextFloat() < multProb) {
                     type = "x"
-                    num = v.fold(1) {acc, i ->  acc * i}
-                }
-                else {
+                    num = v.fold(1) { acc, i -> acc * i }
+                } else {
                     type = "+"
-                    num = v.fold(0) {acc, i ->  acc + i}
+                    num = v.fold(0) { acc, i -> acc + i }
                 }
-                constraints.add("$type $num $cells")
+                constraints.add("$type$num $cells")
+                cageMap[Pair(key, "$num$type")] = value
             }
 
         }
+
+//        for (i in 0 until size) {
+//            val tempList = mutableListOf<KenKenCell?>()
+//            for (j in 0 until size) {
+//                tempList.add(null)
+//            }
+//            kenkenCells.add(tempList)
+//        }
+
+
         constraints.addAll(answer.map { list -> list.joinToString(" ") })
-        return constraints.filter { it.isNotEmpty() }
+//        return constraints.filter { it.isNotEmpty() }
+        return buildKenKenBoard()
     }
 
     private fun possiblyUnion(x: Int, y: Int) {
@@ -125,6 +141,57 @@ class KenKenGenerator {
         constraintMap[y] = mutableListOf()
     }
 
-
+    private fun buildKenKenBoard(): List<List<KenKenCell>> {
+        kenkenCells = kenkenCells.filter { it.isNotEmpty() }.toMutableList()
+        answer.forEachIndexed { x, row ->
+            val tempList = mutableListOf<KenKenCell>()
+            row.forEachIndexed { y, cell ->
+                tempList.add(KenKenCell(cell, null, Pair(x, y)))
+            }
+            kenkenCells.add(tempList)
+        }
+        cageMap.forEach { (keyPair, indices) ->
+            //Get the smallest index to assign the constraint to that square
+            val smallestIndex = indices.minBy { it.first + it.second }
+            smallestIndex?.let {
+                //Extra check to get the smallest y coordinate if multiple indices have the same sum
+                val newSmallest =
+                    indices.filter { (it.first + it.second) == (smallestIndex.first + smallestIndex.second) }
+                        .minBy { it.second }
+                indices.forEach {
+                    kenkenCells[it.first][it.second]?.cage = Cage(
+                        keyPair.first.toString(),
+                        if (it == newSmallest) keyPair.second else null,
+                        mutableSetOf()
+                    )
+                }
+            }
+        }
+        kenkenCells.forEachIndexed { i, rows ->
+            rows.forEachIndexed { j, kenKenCell ->
+                val adjacentCages = mutableSetOf<AdjacentCage>()
+                if (i > 0 && kenkenCells[i - 1][j].cage?.id == kenKenCell.cage?.id) {
+                    adjacentCages.add(AdjacentCage.TOP)
+                }
+                if (j > 0 && kenkenCells[i][j - 1].cage?.id == kenKenCell.cage?.id) {
+                    adjacentCages.add(AdjacentCage.LEFT)
+                }
+                if (i < kenkenCells.size - 1 && kenkenCells[i + 1][j].cage?.id == kenKenCell.cage?.id) {
+                    adjacentCages.add(AdjacentCage.BOTTOM)
+                }
+                if (j < kenkenCells.size - 1 && kenkenCells[i][j + 1].cage?.id == kenKenCell.cage?.id) {
+                    adjacentCages.add(AdjacentCage.RIGHT)
+                }
+                kenKenCell.cage?.adjacentCages?.addAll(adjacentCages)
+            }
+        }
+        return kenkenCells
+    }
 }
+
+data class KenKenCell(
+    val answer: Int,
+    var cage: Cage?,
+    val index: Pair<Int, Int>
+)
 

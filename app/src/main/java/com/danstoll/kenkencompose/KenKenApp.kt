@@ -13,10 +13,9 @@ import androidx.ui.layout.*
 import androidx.ui.material.Button
 import androidx.ui.material.ContainedButtonStyle
 import androidx.ui.text.TextStyle
-import androidx.ui.tooling.preview.Preview
 
 @Composable
-fun KenKenScreen(board: KenKenBoard = KenKenBoard.generateBoard()) {
+fun KenKenScreen(board: KenKenBoard = KenKenBoard.generateBoard(4)) {
     WithConstraints { constraints ->
         val containerWidth = withDensity(+ambientDensity()) {
             constraints.maxWidth.toDp()
@@ -102,7 +101,7 @@ fun DrawBoard(board: KenKenBoard, boardSize: Int, cellDpSize: Dp) {
 }
 
 @Composable
-fun DrawCell(size: Dp, kenCell: KenKenCell, onClick: (KenKenCell) -> Unit) {
+fun DrawCell(size: Dp, kenCell: KenKenCellViewData, onClick: (KenKenCellViewData) -> Unit) {
     val textSize = (size.value * 0.4f).sp
     val operationSize = (size.value * 0.15f).sp
     Clickable(onClick = { onClick(kenCell) }) {
@@ -114,19 +113,19 @@ fun DrawCell(size: Dp, kenCell: KenKenCell, onClick: (KenKenCell) -> Unit) {
                         shape = RectangleShape,
                         color = kenCell.cellType.color
                     )
-                    DrawCellBorder(adjacentCages = kenCell.cage.adjacentCages)
+                    DrawCellBorder(adjacentCages = kenCell.cage?.adjacentCages ?: emptySet())
                 }
             }
             aligned(Alignment.Center) {
                 kenCell.userAnswer?.toString()?.let {
-                    Text(text = it, style = TextStyle(fontSize = textSize))
+                    Text(text = it, style = TextStyle(fontSize = textSize, color = Color.Black))
                 }
             }
 
-            kenCell.cage.text?.let {
+            kenCell.cage?.text?.let {
                 aligned(Alignment.TopLeft) {
                     Padding(5.dp) {
-                        Text(text = it, style = TextStyle(fontSize = operationSize))
+                        Text(text = it, style = TextStyle(fontSize = operationSize, color = Color.Black))
                     }
                 }
             }
@@ -212,13 +211,5 @@ fun getBorderPaint(color: Color, strokeWidth: Int): Paint = Paint().apply {
     this.color = color
     this.strokeWidth = withDensity(+ambientDensity()) {
         strokeWidth.dp.toPx().value
-    }
-}
-
-@Preview("MyScreen preview")
-@Composable
-fun DefaultPreview() {
-    MyAppTheme {
-        KenKenScreen()
     }
 }
