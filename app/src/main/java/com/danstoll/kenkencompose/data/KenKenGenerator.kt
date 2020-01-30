@@ -1,6 +1,8 @@
-package com.danstoll.kenkencompose
+package com.danstoll.kenkencompose.data
 
 import android.util.Log
+import com.danstoll.kenkencompose.AdjacentCage
+import com.danstoll.kenkencompose.Cage
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -27,7 +29,7 @@ class KenKenGenerator {
     private var kenkenCells = mutableListOf(mutableListOf<KenKenCell>())
     private val cageMap = mutableMapOf<Pair<Int, String>, List<Pair<Int, Int>>>()
 
-    fun generate(size: Int): List<List<KenKenCell>> {
+    fun generate(size: Int): KenKenBoard {
 
 
         val n = size
@@ -129,7 +131,7 @@ class KenKenGenerator {
             return
 
         // Determine if should union
-        val probFactor = max(constraintMap[x]?.let { 2 } ?: 1, constraintMap[y]?.let { 2 } ?: 1)
+        val probFactor = max(constraintMap[x]?.size ?: 1, constraintMap[y]?.size ?: 1)
         if (Random.nextFloat() > startingUnionProb / probFactor)
             return
 
@@ -141,12 +143,18 @@ class KenKenGenerator {
         constraintMap[y] = mutableListOf()
     }
 
-    private fun buildKenKenBoard(): List<List<KenKenCell>> {
+    private fun buildKenKenBoard(): KenKenBoard {
         kenkenCells = kenkenCells.filter { it.isNotEmpty() }.toMutableList()
         answer.forEachIndexed { x, row ->
             val tempList = mutableListOf<KenKenCell>()
             row.forEachIndexed { y, cell ->
-                tempList.add(KenKenCell(cell, null, Pair(x, y)))
+                tempList.add(
+                    KenKenCell(
+                        cell,
+                        null,
+                        Pair(x, y)
+                    )
+                )
             }
             kenkenCells.add(tempList)
         }
@@ -159,11 +167,12 @@ class KenKenGenerator {
                     indices.filter { (it.first + it.second) == (smallestIndex.first + smallestIndex.second) }
                         .minBy { it.second }
                 indices.forEach {
-                    kenkenCells[it.first][it.second]?.cage = Cage(
-                        keyPair.first.toString(),
-                        if (it == newSmallest) keyPair.second else null,
-                        mutableSetOf()
-                    )
+                    kenkenCells[it.first][it.second].cage =
+                        Cage(
+                            keyPair.first.toString(),
+                            if (it == newSmallest) keyPair.second else null,
+                            mutableSetOf()
+                        )
                 }
             }
         }
@@ -185,13 +194,7 @@ class KenKenGenerator {
                 kenKenCell.cage?.adjacentCages?.addAll(adjacentCages)
             }
         }
-        return kenkenCells
+        return KenKenBoard(kenkenCells)
     }
 }
-
-data class KenKenCell(
-    val answer: Int,
-    var cage: Cage?,
-    val index: Pair<Int, Int>
-)
 

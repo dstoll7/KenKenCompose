@@ -2,9 +2,11 @@ package com.danstoll.kenkencompose
 
 import androidx.compose.Model
 import androidx.ui.graphics.Color
+import com.danstoll.kenkencompose.data.KenKenGenerator
+import com.danstoll.kenkencompose.data.boards
 
 @Model
-class KenKenBoard(val kenKenCells: List<List<KenKenCellViewData>>) {
+class KenKenBoardViewData(val kenKenCells: List<List<KenKenCellViewData>>) {
     private var selectedCellIndex = Pair(0, 0)
 
     private var checkAnswers = false
@@ -14,14 +16,6 @@ class KenKenBoard(val kenKenCells: List<List<KenKenCellViewData>>) {
 
     fun selectCell(selectedCell: KenKenCellViewData) {
         selectedCellIndex = selectedCell.index
-//        kenKenCells.forEachIndexed { x, arrayOfCells ->
-//            arrayOfCells.forEachIndexed { y, cell ->
-//                if (selectedCell == cell) {
-//                    selectedCellIndex = Pair(x, y)
-//                    return
-//                }
-//            }
-//        }
     }
 
     fun userInput(number: Int) {
@@ -50,13 +44,13 @@ class KenKenBoard(val kenKenCells: List<List<KenKenCellViewData>>) {
 
     companion object {
 
-        fun generateBoard(size: Int): KenKenBoard {
-            val squares = KenKenGenerator().generate(size).map {
+        fun getBoard(size: Int): KenKenBoardViewData? {
+            val squares = boards[size]?.kenKenCells?.map {
                 it.map { cell ->
                     KenKenCellViewData.create(cell.answer, cell.cage, cell.index)
                 }
             }
-            return KenKenBoard(squares)
+            return squares?.let { KenKenBoardViewData(it) }
         }
     }
 }
